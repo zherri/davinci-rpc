@@ -1,10 +1,13 @@
 import time
-import sys
+import os
+import psutil
 from pypresence import Presence, DiscordNotFound, InvalidID
 import DaVinciResolveScript as dvr
 
 CLIENT_ID = "1440756413520543886"  # Discord application's client ID
 UPDATE_INTERVAL = 5  # seconds
+
+DAVINCI_PROCESS_NAME = "Resolve.exe"  # DaVinci's process name on Windows
 
 
 def connect_discord():
@@ -25,21 +28,16 @@ def get_resolve():
     resolve = dvr.scriptapp("Resolve")
     if not resolve:
         print("[ERROR] DaVinci Resolve not found. Exiting...")
-        sys.exit(0)
+        os._exit(1)
     return resolve
 
 
-def resolve_is_alive(resolve):
-    """Checks if Resolve is still running."""
-    try:
-        # Attempt to access something lightweight
-        pm = resolve.GetProjectManager()
-        if pm is None:
-            return False
-        pm.GetCurrentProject()  # Touch something to verify
-        return True
-    except:
-        return False
+def resolve_is_alive():
+    """Checks if DaVinci Resolve process is running."""
+    for proc in psutil.process_iter(["name"]):
+        if proc.info["name"] == DAVINCI_PROCESS_NAME:
+            return True
+    return False
 
 
 def update_presence(rpc, resolve):
@@ -87,14 +85,14 @@ def main():
     resolve = get_resolve()
 
     while True:
-        # If Resolve is closed -> stop
-        if not resolve_is_alive(resolve):
-            print("[INFO] DaVinci Resolve closed. Exiting...")
+        # If Resolve process is not running -> stop
+        if not resolve_is_alive():
+            print("[INFO] DaVinci Resolve process closed. Exiting RPC...")
             try:
                 rpc.clear()
             except:
                 pass
-            sys.exit(0)
+            os._exit(0)
 
         # Try updating RPC
         try:
@@ -104,7 +102,7 @@ def main():
             rpc = connect_discord()
         except Exception as e:
             print(f"[ERROR] Unexpected RPC error: {e}")
-            sys.exit(1)
+            os._exit(1)
 
         time.sleep(UPDATE_INTERVAL)
 
